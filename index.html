@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Dhara Pustak Sadan</title>
+
+<style>
+:root{
+  --accent:#0b6efd;
+  --muted:#666;
+  --bg:#f5f7fb;
+  --card:#fff;
+}
+body{font-family:Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:#222}
+header{
+  background:linear-gradient(90deg,var(--accent),#0b8af0);
+  color:#fff; padding:14px 20px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.brand-wrap{flex:1;text-align:center}
+.brand{font-size:22px;font-weight:800}
+.tag{font-size:13px;opacity:.9;margin-top:-2px}
+.hamb{font-size:24px;cursor:pointer}
+.admin-ic{font-size:22px;background:none;border:0;color:#fff;cursor:pointer}
+
+.container{max-width:1100px;margin:20px auto;padding:0 15px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.controls select,.controls input{padding:8px;border:1px solid #ccc;border-radius:6px}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.card{
+  background:#fff;padding:12px;border-radius:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.08);
+  display:flex;flex-direction:column;gap:6px
+}
+.prod-img{
+  height:150px;background:#eee;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;color:#888;overflow:hidden
+}
+.prod-img img{width:100%;height:100%;object-fit:cover;border-radius:8px}
+.price{font-weight:700}
+.btn{background:var(--accent);color:#fff;border:0;padding:8px 10px;border-radius:8px;cursor:pointer}
+.btn.secondary{background:#e9eefb;color:var(--accent);border:1px solid rgba(0,0,0,.1)}
+
+.cart{
+  position:fixed;right:15px;bottom:15px;
+  background:#fff;padding:14px;border-radius:12px;
+  box-shadow:0 8px 30px rgba(0,0,0,0.15);
+  width:320px;max-width:90%;
+}
+.cart h3{margin:0 0 6px 0}
+.cart-item{border-bottom:1px solid #eee;padding:6px 0;display:flex;justify-content:space-between}
+
+footer{text-align:center;padding:18px;font-size:13px;color:#666;margin-top:40px}
+
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,0.4);
+  display:flex;align-items:center;justify-content:center;z-index:60
+}
+.modal{background:#fff;border-radius:10px;padding:18px;max-width:700px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.3)}
+
+#orderPage{
+  position:fixed;inset:0;z-index:70;display:none;
+  background:#fff;overflow-y:auto;padding:20px;
+}
+.empty{padding:25px;text-align:center;background:#fff;border-radius:8px;color:#888}
+
+#contactPage{
+  position:fixed;inset:0;background:#fff;z-index:70;display:none;padding:20px;
+}
+</style>
+</head>
+<body>
+
+<!-- CONTACT PAGE -->
+<div id="contactPage">
+  <h2>Contact Us</h2>
+  <p><strong>Dhara Pustak Sadan</strong></p>
+  <p><strong>Mobile:</strong> 9125622219</p>
+  <p><strong>Address:</strong> 611 Mahadev Mall, behind HDFC Bank, Shantipuram, Phaphamau, Prayagraj 211013</p>
+  <p><strong>Email:</strong> dharapustaksadan@gmail.com</p>
+  <button class="btn secondary" onclick="document.getElementById('contactPage').style.display='none'">Close</button>
+</div>
+
+<header>
+  <div class="hamb" id="menuBtn">☰</div>
+  <div class="brand-wrap">
+    <div class="brand">Dhara Pustak Sadan</div>
+    <div class="tag">Academic Books • Stationery • Gift & Craft</div>
+  </div>
+  <button class="admin-ic" id="adminToggle">⚙</button>
+</header>
+
+<main id="storeMain" class="container">
+  <div class="controls">
+    <select id="filterType">
+      <option value="">All types</option>
+      <option>Academic</option>
+      <option>Stationary</option>
+      <option>Gift</option>
+      <option>Craft</option>
+    </select>
+    <select id="filterCategory"><option value="">All categories</option></select>
+    <input id="searchBox" placeholder="Search name / SKU..."/>
+    <button id="resetFilters" class="btn secondary">Reset</button>
+  </div>
+
+  <div class="muted">Total: <span id="totalCount">0</span></div>
+  <div id="productList" class="card-grid"></div>
+</main>
+
+<!-- CART -->
+<aside class="cart" id="cartBox">
+  <h3>Order Cart</h3>
+  <div id="cartItems"></div>
+  <div style="display:flex;justify-content:space-between;margin-top:8px">
+    <span class="muted">Total</span>
+    <strong id="cartTotal">₹0.00</strong>
+  </div>
+  <button id="placeOrder" class="btn" style="width:100%;margin-top:10px">Place Order</button>
+</aside>
+
+<!-- FULL ORDER PAGE -->
+<div id="orderPage">
+  <h2>Order Details</h2>
+  <div id="orderItems"></div>
+  <h3>Total: <span id="orderGrandTotal">₹0.00</span></h3>
+
+  <h3>Customer Details</h3>
+  <input id="ord_name" placeholder="Full Name" style="width:100%;padding:8px;margin-bottom:8px"/>
+  <input id="ord_phone" placeholder="Phone" style="width:100%;padding:8px;margin-bottom:8px"/>
+  <input id="ord_email" placeholder="Email (optional)" style="width:100%;padding:8px;margin-bottom:8px"/>
+  <textarea id="ord_addr" placeholder="Address" rows="3" style="width:100%;padding:8px;margin-bottom:8px"></textarea>
+  <input id="ord_notes" placeholder="Notes (optional)" style="width:100%;padding:8px;margin-bottom:10px"/>
+
+  <button id="sendOrder" class="btn">Send Order</button>
+  <button id="cancelOrder" class="btn secondary">Cancel</button>
+</div>
+
+<!-- ADMIN MODAL ROOT -->
+<div id="adminModal" style="display:none"></div>
+
+<footer>© Dhara Pustak Sadan • All Rights Reserved</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<script>
+const DEFAULT_PRODUCTS=[
+  {id:1,name:"Mathematics Class 9",type:"Academic",category:"Class 9",sku:"MATH-09",price:180,quantity:50,description:"Math Book",image:""},
+  {id:2,name:"A4 Notebook 200 pages",type:"Stationary",category:"Notebooks",sku:"NB-A4",price:65,quantity:120,description:"Ruled notebook",image:""},
+];
+
+function saveP(a){localStorage.setItem('dps_products',JSON.stringify(a))}
+function loadP(){let d=localStorage.getItem('dps_products');return d?JSON.parse(d):(saveP(DEFAULT_PRODUCTS),DEFAULT_PRODUCTS)}
+let products=loadP();
+
+function saveC(a){localStorage.setItem('dps_cart',JSON.stringify(a))}
+function loadC(){let d=localStorage.getItem('dps_cart');return d?JSON.parse(d):[]}
+let cart=loadC();
+
+const productList=document.getElementById('productList');
+const filterType=document.getElementById('filterType');
+const filterCategory=document.getElementById('filterCategory');
+const searchBox=document.getElementById('searchBox');
+const totalCount=document.getElementById('totalCount');
+const cartItems=document.getElementById('cartItems');
+const cartTotal=document.getElementById('cartTotal');
+
+function refreshCats(){
+  const base=["Class 1","Class 2","Class 3","Class 4","Class 5","Class 6","Class 7","Class 8","Class 9","Class 10","Class 11","Class 12"];
+  let cats=[...new Set(products.map(p=>p.category))]
+  base.forEach(c=>{if(!cats.includes(c)) cats.push(c)})
+  filterCategory.innerHTML='<option value="">All categories</option>';
+  cats.forEach(c=>filterCategory.innerHTML+=`<option>${c}</option>`)
+}
+
+function render(){
+  let t=filterType.value,c=filterCategory.value,s=searchBox.value.toLowerCase();
+  let f=products.filter(p=>{
+    if(t && p.type!==t) return false;
+    if(c && p.category!==c) return false;
+    if(s && !p.name.toLowerCase().includes(s)) return false;
+    return true;
+  });
+
+  totalCount.textContent=f.length;
+  productList.innerHTML="";
+  if(!f.length){productList.innerHTML='<div class="empty">No products</div>';return}
+
+  f.forEach(p=>{
+    let card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`
+      <div class="prod-img">${p.image?`<img src="${p.image}">`:'No Image'}</div>
+      <div style="font-weight:700">${p.name}</div>
+      <div class="muted">${p.sku}</div>
+      <div class="muted">${p.description||''}</div>
+      <div><strong>₹${p.price}</strong> • Stock: ${p.quantity}</div>
+      <button class="btn" onclick="addToCart(${p.id})">Add to Cart</button>
+      ${window.__adm?`<button class="btn secondary" onclick="editP(${p.id})">Edit</button><button class="btn secondary" onclick="removeP(${p.id})">Delete</button>`:''}
+    `;
+    productList.appendChild(card);
+  })
+}
+
+function addToCart(id){
+  let p=products.find(x=>x.id===id);
+  if(!p) return;
+  let ex=cart.find(x=>x.id===id);
+  if(ex) ex.qty++;
+  else cart.push({id,pid:p.id,qty:1,price:p.price,name:p.name});
+  saveC(cart);drawCart();
+}
+
+function drawCart(){
+  cartItems.innerHTML="";
+  let total=0;
+  if(!cart.length){cartItems.innerHTML='<div class="muted">Cart empty</div>';cartTotal.textContent='₹0.00';return}
+  cart.forEach(ci=>{
+    const row=document.createElement('div');row.className='cart-item';
+    let sub=(ci.price*ci.qty);
+    row.innerHTML=`<div>${ci.name} (x${ci.qty})</div><div>₹${sub}</div>`;
+    cartItems.appendChild(row);
+    total+=sub;
+  })
+  cartTotal.textContent='₹'+total.toFixed(2);
+}
+
+// ORDER PAGE
+const orderPage=document.getElementById('orderPage');
+document.getElementById('placeOrder').onclick=openOrder;
+function openOrder(){
+  if(cart.length===0)return alert("Cart empty");
+  // hide cart
+  document.getElementById('cartBox').style.display='none';
+  document.getElementById('storeMain').style.display='none';
+  orderPage.style.display='block';
+
+  const oi=document.getElementById('orderItems');
+  oi.innerHTML='';
+  let t=0;
+  cart.forEach(ci=>{
+    let p=products.find(x=>x.id===ci.id)||{};
+    let sub=(ci.qty*ci.price);
+    oi.innerHTML+=`<p><strong>${ci.name}</strong> • x${ci.qty} • ₹${sub}</p>`;
+    t+=sub;
+  })
+  document.getElementById('orderGrandTotal').textContent='₹'+t.toFixed(2);
+}
+document.getElementById('cancelOrder').onclick=()=>{
+  orderPage.style.display='none';
+  document.getElementById('storeMain').style.display='block';
+  document.getElementById('cartBox').style.display='block';
+}
+
+document.getElementById('sendOrder').onclick = async ()=>{
+  let n=document.getElementById('ord_name').value.trim();
+  let ph=document.getElementById('ord_phone').value.trim();
+  let ad=document.getElementById('ord_addr').value.trim();
+  let em=document.getElementById('ord_email').value.trim();
+  let notes=document.getElementById('ord_notes').value.trim();
+
+  if(!n||!ph||!ad){
+    alert("Fill Name, Phone and Address");
+    return;
+  }
+
+  let orderData = {
+    name: n,
+    phone: ph,
+    email: em,
+    address: ad,
+    notes: notes,
+    items: cart
+  };
+
+  try {
+    let res = await fetch("http://localhost:3000/api/order", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(orderData)
+    });
+
+    let data = await res.json();
+
+    if(data.success){
+      alert("✅ Order Sent Successfully!\nOrder ID: "+data.orderId);
+      cart = [];
+      saveC(cart);
+      drawCart();
+      orderPage.style.display='none';
+      document.getElementById('cartBox').style.display='block';
+      document.getElementById('storeMain').style.display='block';
+    } else {
+      alert("❌ Error: "+data.message);
+    }
+
+  } catch (err){
+    alert("❌ Server not responding. Make sure backend is running.");
+  }
+};
+
+// CONTACT MENU
+document.getElementById('menuBtn').onclick=()=>document.getElementById('contactPage').style.display='block';
+
+// ADMIN LOGIN
+const adminModal=document.getElementById('adminModal');
+document.getElementById('adminToggle').onclick=()=>openAdmin();
+function openAdmin(){
+  const m=document.createElement('div');
+  m.className='modal-backdrop';
+  m.innerHTML=`<div class="modal">
+    <h3>Admin Login</h3>
+    <input id="adm_pw" type="password" placeholder="Password: admin"/>
+    <button class="btn" id="admGo">Login</button>
+    <button class="btn secondary" onclick="closeAdmin()">Cancel</button>
+  </div>`;
+  adminModal.innerHTML="";adminModal.appendChild(m);adminModal.style.display='block';
+  document.getElementById('admGo').onclick=()=>{
+    if(document.getElementById('adm_pw').value==='admin'){window.__adm=true;closeAdmin();adminPanel()}
+    else alert("Wrong password");
+  }
+}
+function closeAdmin(){adminModal.style.display='none';adminModal.innerHTML=""}
+
+// ADMIN PANEL
+function adminPanel(){
+  const m=document.createElement('div');
+  m.className='modal-backdrop';
+  m.innerHTML=`<div class="modal">
+    <h3>Admin Panel</h3>
+    <button class="btn" onclick="addForm()">Add Product</button>
+    <button class="btn secondary" onclick="importExcel()">Import Excel</button>
+    <button class="btn secondary" onclick="closeAdmin()">Close</button>
+    <h4>Product List</h4>
+    <div id="admList" style="max-height:300px;overflow:auto"></div>
+  </div>`;
+  adminModal.innerHTML="";adminModal.appendChild(m);adminModal.style.display='block';
+
+  const l=document.getElementById('admList');
+  l.innerHTML="";
+  products.forEach(p=>{
+    let row=document.createElement('div');
+    row.style.padding='6px 0;border-bottom:1px solid #eee';
+    row.innerHTML=`<strong>${p.name}</strong>
+      <button class="btn secondary" onclick="editP(${p.id})">Edit</button>
+      <button class="btn secondary" onclick="removeP(${p.id})">Delete</button>`;
+    l.appendChild(row);
+  });
+}
+
+// ADD PRODUCT
+function addForm(){
+  const m=document.createElement('div');
+  m.className='modal-backdrop';
+  m.innerHTML=`<div class="modal">
+    <h3>Add Product</h3>
+    <input id="n_name" placeholder="Name" style="width:100%;margin-bottom:6px"/>
+    <select id="n_type" style="width:100%;margin-bottom:6px">
+      <option>Academic</option><option>Stationary</option><option>Gift</option><option>Craft</option>
+    </select>
+    <input id="n_cat" placeholder="Category" style="width:100%;margin-bottom:6px"/>
+    <input id="n_price" type="number" placeholder="Price" style="width:100%;margin-bottom:6px"/>
+    <input id="n_qty" type="number" placeholder="Stock" style="width:100%;margin-bottom:6px"/>
+    <input id="n_img" placeholder="Image URL" style="width:100%;margin-bottom:6px"/>
+    <textarea id="n_desc" placeholder="Description" style="width:100%;margin-bottom:6px"></textarea>
+    <button class="btn" onclick="saveNew()">Save</button>
+    <button class="btn secondary" onclick="closeAdmin()">Cancel</button>
+  </div>`;
+  adminModal.innerHTML="";adminModal.appendChild(m);
+}
+function saveNew(){
+  let name=document.getElementById('n_name').value;
+  if(!name) return alert("Name required");
+  let id=Date.now();
+  products.push({
+    id,
+    name,
+    type:document.getElementById('n_type').value,
+    category:document.getElementById('n_cat').value||'General',
+    sku:"SKU"+id,
+    price:Number(document.getElementById('n_price').value)||0,
+    quantity:Number(document.getElementById('n_qty').value)||0,
+    description:document.getElementById('n_desc').value||'',
+    image:document.getElementById('n_img').value||''
+  });
+  saveP(products);
+  refreshCats();render();
+  closeAdmin();
+  adminPanel();
+}
+
+// EDIT PRODUCT
+function editP(id){
+  const p=products.find(x=>x.id===id);
+  if(!p)return;
+  const m=document.createElement('div');
+  m.className='modal-backdrop';
+  m.innerHTML=`<div class="modal">
+    <h3>Edit Product</h3>
+    <input id="e_name" value="${p.name}" style="width:100%;margin-bottom:6px"/>
+    <select id="e_type" style="width:100%;margin-bottom:6px">
+      <option${p.type==='Academic'?' selected':''}>Academic</option>
+      <option${p.type==='Stationary'?' selected':''}>Stationary</option>
+      <option${p.type==='Gift'?' selected':''}>Gift</option>
+      <option${p.type==='Craft'?' selected':''}>Craft</option>
+    </select>
+    <input id="e_cat" value="${p.category}" style="width:100%;margin-bottom:6px"/>
+    <input id="e_price" type="number" value="${p.price}" style="width:100%;margin-bottom:6px"/>
+    <input id="e_qty" type="number" value="${p.quantity}" style="width:100%;margin-bottom:6px"/>
+    <input id="e_img" value="${p.image}" style="width:100%;margin-bottom:6px"/>
+    <textarea id="e_desc" style="width:100%;margin-bottom:6px">${p.description}</textarea>
+    <button class="btn" onclick="saveEdit(${p.id})">Save</button>
+    <button class="btn secondary" onclick="closeAdmin()">Cancel</button>
+  </div>`;
+  adminModal.innerHTML="";adminModal.appendChild(m);
+}
+function saveEdit(id){
+  let p=products.find(x=>x.id===id);
+  p.name=document.getElementById('e_name').value;
+  p.type=document.getElementById('e_type').value;
+  p.category=document.getElementById('e_cat').value;
+  p.price=Number(document.getElementById('e_price').value)||0;
+  p.quantity=Number(document.getElementById('e_qty').value)||0;
+  p.image=document.getElementById('e_img').value;
+  p.description=document.getElementById('e_desc').value;
+  saveP(products);refreshCats();render();closeAdmin();adminPanel();
+}
+
+// DELETE PRODUCT
+function removeP(id){
+  if(!confirm("Delete this product?"))return;
+  products=products.filter(x=>x.id!==id);
+  saveP(products);render();closeAdmin();adminPanel();
+}
+
+// IMPORT EXCEL
+function importExcel(){
+  const input=document.createElement('input');
+  input.type='file';input.accept='.xlsx,.xls';
+  input.onchange=()=>{
+    let file=input.files[0];if(!file)return;
+    let reader=new FileReader();
+    reader.onload=(e)=>{
+      let wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      let sheet=wb.Sheets[wb.SheetNames[0]];
+      let rows=XLSX.utils.sheet_to_json(sheet);
+      let added=0;
+      rows.forEach(r=>{
+        if(!r.name) return;
+        let id=Date.now()+Math.random();
+        products.push({
+          id,
+          name:r.name,
+          type:r.type||"Stationary",
+          category:r.category||"General",
+          sku:r.sku||("SKU"+id),
+          price:Number(r.price)||0,
+          quantity:Number(r.quantity)||0,
+          description:r.description||"",
+          image:r.image||""
+        });
+        added++;
+      })
+      saveP(products);refreshCats();render();
+      alert(added+" products imported");
+      closeAdmin();adminPanel();
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  input.click();
+}
+
+// EVENT CONNECTION
+filterType.onchange=render;
+filterCategory.onchange=render;
+searchBox.oninput=render;
+document.getElementById('resetFilters').onclick=()=>{filterType.value="";filterCategory.value="";searchBox.value="";render()}
+
+// INIT
+refreshCats();render();drawCart();
+</script>
+</body>
+</html>
