@@ -60,5 +60,9 @@ app.post("/api/order", async (req, res) => {
   }
 });
 
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 // ✅ run backend
 app.listen(3000, () => console.log("✅ Backend running at http://localhost:3000"));
