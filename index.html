@@ -55,7 +55,7 @@ header{
 footer{text-align:center;padding:18px;font-size:13px;color:#666;margin-top:40px}
 
 .modal-backdrop{
-  position:fixed;inset:0;background:rgba(0,0,0,0.4);
+  position:fixed;inset:0;background:rgba(0,0,0,0.45);
   display:flex;align-items:center;justify-content:center;z-index:60
 }
 .modal{background:#fff;border-radius:10px;padding:18px;max-width:700px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.3)}
@@ -69,12 +69,16 @@ footer{text-align:center;padding:18px;font-size:13px;color:#666;margin-top:40px}
 #contactPage{
   position:fixed;inset:0;background:#fff;z-index:70;display:none;padding:20px;
 }
+
+.admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.small{font-size:13px;padding:6px 8px;border-radius:6px}
+.input-inline{padding:6px;border:1px solid #ccc;border-radius:6px}
 </style>
 </head>
 <body>
 
 <!-- CONTACT PAGE -->
-<div id="contactPage">
+<div id="contactPage" style="display:none;">
   <h2>Contact Us</h2>
   <p><strong>Dhara Pustak Sadan</strong></p>
   <p><strong>Mobile:</strong> 9125622219</p>
@@ -97,13 +101,28 @@ footer{text-align:center;padding:18px;font-size:13px;color:#666;margin-top:40px}
     <select id="filterType">
       <option value="">All types</option>
       <option>Academic</option>
-      <option>Stationary</option>
+      <option>Stationery</option>
       <option>Gift</option>
       <option>Craft</option>
     </select>
+
     <select id="filterCategory"><option value="">All categories</option></select>
-    <input id="searchBox" placeholder="Search name / SKU..."/>
+    <input id="searchBox" placeholder="Search name / SKU..." />
     <button id="resetFilters" class="btn secondary">Reset</button>
+  </div>
+
+  <!-- Admin toolbar (visible only in admin mode) -->
+  <div id="adminToolbar" style="display:none;margin-bottom:12px">
+    <div class="admin-actions">
+      <button id="btnAddProduct" class="btn small">Add Product</button>
+      <label class="small" style="display:inline-flex;align-items:center;gap:6px">
+        <input id="importFile" type="file" accept=".xlsx,.xls,.csv" style="display:none"/>
+        <button id="btnImport" class="btn small">Import Excel</button>
+      </label>
+      <button id="btnExport" class="btn small secondary">Export Excel</button>
+      <button id="btnExportJSON" class="btn small secondary">Download JSON</button>
+      <button id="btnClearProducts" class="btn small secondary">Reset Products</button>
+    </div>
   </div>
 
   <div class="muted">Total: <span id="totalCount">0</span></div>
@@ -121,7 +140,7 @@ footer{text-align:center;padding:18px;font-size:13px;color:#666;margin-top:40px}
   <button id="placeOrder" class="btn" style="width:100%;margin-top:10px">Place Order</button>
 </aside>
 
-<!-- FULL ORDER PAGE -->
+<!-- ORDER PAGE -->
 <div id="orderPage">
   <h2>Order Details</h2>
   <div id="orderItems"></div>
@@ -138,171 +157,352 @@ footer{text-align:center;padding:18px;font-size:13px;color:#666;margin-top:40px}
   <button id="cancelOrder" class="btn secondary">Cancel</button>
 </div>
 
-<!-- ADMIN MODAL ROOT -->
-<div id="adminModal" style="display:none"></div>
+<!-- ADMIN MODAL -->
+<div id="adminModalRoot" style="display:none"></div>
 
 <footer>© Dhara Pustak Sadan • All Rights Reserved</footer>
 
+<!-- xlsx -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<script src="server.js"></script>
 
 <script>
+/* -------------- Data & Storage -------------- */
 const DEFAULT_PRODUCTS=[
   {id:1,name:"Mathematics Class 9",type:"Academic",category:"Class 9",sku:"MATH-09",price:180,quantity:50,description:"Math Book",image:""},
-  {id:2,name:"A4 Notebook 200 pages",type:"Stationary",category:"Notebooks",sku:"NB-A4",price:65,quantity:120,description:"Ruled notebook",image:""},
+  {id:2,name:"A4 Notebook 200 pages",type:"Stationery",category:"Notebooks",sku:"NB-A4",price:65,quantity:120,description:"Ruled notebook",image:""},
 ];
 
 function saveP(a){localStorage.setItem('dps_products',JSON.stringify(a))}
-function loadP(){let d=localStorage.getItem('dps_products');return d?JSON.parse(d):(saveP(DEFAULT_PRODUCTS),DEFAULT_PRODUCTS)}
-let products=loadP();
+function loadP(){let d=localStorage.getItem('dps_products');if(d) return JSON.parse(d); saveP(DEFAULT_PRODUCTS); return DEFAULT_PRODUCTS.slice();}
+let products = loadP();
 
 function saveC(a){localStorage.setItem('dps_cart',JSON.stringify(a))}
 function loadC(){let d=localStorage.getItem('dps_cart');return d?JSON.parse(d):[]}
-let cart=loadC();
+let cart = loadC();
 
-const productList=document.getElementById('productList');
-const filterType=document.getElementById('filterType');
-const filterCategory=document.getElementById('filterCategory');
-const searchBox=document.getElementById('searchBox');
-const totalCount=document.getElementById('totalCount');
-const cartItems=document.getElementById('cartItems');
-const cartTotal=document.getElementById('cartTotal');
+/* -------------- UI refs -------------- */
+const productList = document.getElementById('productList');
+const filterType = document.getElementById('filterType');
+const filterCategory = document.getElementById('filterCategory');
+const searchBox = document.getElementById('searchBox');
+const totalCount = document.getElementById('totalCount');
+const cartItems = document.getElementById('cartItems');
+const cartTotal = document.getElementById('cartTotal');
+const adminToggle = document.getElementById('adminToggle');
+const adminToolbar = document.getElementById('adminToolbar');
+const adminModalRoot = document.getElementById('adminModalRoot');
+const importFile = document.getElementById('importFile');
+
+/* -------------- Admin state -------------- */
+let isAdmin = false;
+const ADMIN_PASSWORD = "admin123"; // change to desired password
+
+/* -------------- Helpers -------------- */
+function uid(){ return Date.now() + Math.floor(Math.random()*999) }
 
 function refreshCats(){
   const base=["Class 1","Class 2","Class 3","Class 4","Class 5","Class 6","Class 7","Class 8","Class 9","Class 10","Class 11","Class 12"];
-  let cats=[...new Set(products.map(p=>p.category))];
-  base.forEach(c=>{if(!cats.includes(c)) cats.push(c)});
-  filterCategory.innerHTML='<option value="">All categories</option>';
-  cats.forEach(c=>filterCategory.innerHTML+=`<option>${c}</option>`);
+  let cats=[...new Set(products.map(p=>p.category || ""))].filter(Boolean);
+  base.forEach(c=>{ if(!cats.includes(c)) cats.push(c) });
+  filterCategory.innerHTML = '<option value="">All categories</option>';
+  cats.forEach(c => filterCategory.innerHTML += `<option>${c}</option>`);
 }
 
+/* -------------- Render -------------- */
 function render(){
-  let t=filterType.value,c=filterCategory.value,s=searchBox.value.toLowerCase();
-  let f=products.filter(p=>{
-    if(t && p.type!==t) return false;
-    if(c && p.category!==c) return false;
-    if(s && !p.name.toLowerCase().includes(s)) return false;
+  let t = filterType.value, c = filterCategory.value, s = searchBox.value.toLowerCase();
+  let f = products.filter(p=>{
+    if(t && p.type !== t) return false;
+    if(c && p.category !== c) return false;
+    if(s && !(p.name || "").toLowerCase().includes(s) && !(p.sku||"").toLowerCase().includes(s)) return false;
     return true;
   });
 
-  totalCount.textContent=f.length;
-  productList.innerHTML="";
-  if(!f.length){productList.innerHTML='<div class="empty">No products</div>';return}
+  totalCount.textContent = f.length;
+  productList.innerHTML = f.length ? "" : '<div class="empty">No products</div>';
 
   f.forEach(p=>{
-    let card=document.createElement('div');
-    card.className='card';
-    card.innerHTML=`
-      <div class="prod-img">${p.image?`<img src="${p.image}">`:'No Image'}</div>
-      <div style="font-weight:700">${p.name}</div>
-      <div class="muted">${p.sku}</div>
-      <div class="muted">${p.description||''}</div>
-      <div><strong>₹${p.price}</strong> • Stock: ${p.quantity}</div>
-      <button class="btn" onclick="addToCart(${p.id})">Add to Cart</button>
-      ${window.__adm?`<button class="btn secondary" onclick="editP(${p.id})">Edit</button><button class="btn secondary" onclick="removeP(${p.id})">Delete</button>`:''}
+    let card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="prod-img">${p.image?`<img src="${p.image}" alt="">`:'No Image'}</div>
+      <div style="font-weight:700">${escapeHtml(p.name)}</div>
+      <div class="muted">${escapeHtml(p.sku || '')}</div>
+      <div class="muted">${escapeHtml(p.description || '')}</div>
+      <div><strong>₹${Number(p.price)}</strong> • Stock: ${Number(p.quantity)}</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn" onclick="addToCart(${p.id})">Add to Cart</button>
+        ${isAdmin?`<button class="btn secondary" onclick="openEditProduct(${p.id})">Edit</button>
+        <button class="btn secondary" onclick="removeProduct(${p.id})">Delete</button>`:''}
+      </div>
     `;
     productList.appendChild(card);
-  })
+  });
 }
 
+/* simple HTML escape */
+function escapeHtml(s){ if(!s && s!==0) return ''; return String(s).replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])) }
+
+/* -------------- Cart -------------- */
 function addToCart(id){
-  let p=products.find(x=>x.id===id);
-  if(!p) return;
-  let ex=cart.find(x=>x.id===id);
+  let p = products.find(x=>x.id===id); if(!p) return;
+  let ex = cart.find(x=>x.id===id);
   if(ex) ex.qty++;
-  else cart.push({id,pid:p.id,qty:1,price:p.price,name:p.name});
-  saveC(cart);drawCart();
+  else cart.push({ id: id, pid: p.id, qty: 1, price: p.price, name: p.name });
+  saveC(cart); drawCart();
 }
 
 function drawCart(){
-  cartItems.innerHTML="";
-  let total=0;
-  if(!cart.length){cartItems.innerHTML='<div class="muted">Cart empty</div>';cartTotal.textContent='₹0.00';return}
+  cartItems.innerHTML = "";
+  let total = 0;
+  if(!cart.length){ cartItems.innerHTML = '<div class="muted">Cart empty</div>'; cartTotal.textContent='₹0.00'; return; }
   cart.forEach(ci=>{
-    const row=document.createElement('div');row.className='cart-item';
-    let sub=(ci.price*ci.qty);
-    row.innerHTML=`<div>${ci.name} (x${ci.qty})</div><div>₹${sub}</div>`;
+    let sub = (ci.qty * ci.price);
+    const row = document.createElement('div');
+    row.className = 'cart-item';
+    row.innerHTML = `<div>${escapeHtml(ci.name)} (x${ci.qty})</div><div>₹${sub.toFixed(2)}</div>`;
     cartItems.appendChild(row);
-    total+=sub;
-  })
-  cartTotal.textContent='₹'+total.toFixed(2);
+    total += sub;
+  });
+  cartTotal.textContent = '₹' + total.toFixed(2);
 }
 
-// ORDER PAGE
-const orderPage=document.getElementById('orderPage');
-document.getElementById('placeOrder').onclick=openOrder;
+/* -------------- Order Flow -------------- */
+const orderPage = document.getElementById('orderPage');
+document.getElementById('placeOrder').onclick = openOrder;
 function openOrder(){
-  if(cart.length===0)return alert("Cart empty");
+  if(cart.length===0) return alert("Cart empty");
   document.getElementById('cartBox').style.display='none';
   document.getElementById('storeMain').style.display='none';
   orderPage.style.display='block';
 
-  const oi=document.getElementById('orderItems');
-  oi.innerHTML='';
-  let t=0;
+  const oi = document.getElementById('orderItems');
+  oi.innerHTML = '';
+  let t = 0;
   cart.forEach(ci=>{
-    let p=products.find(x=>x.id===ci.id)||{};
-    let sub=(ci.qty*ci.price);
-    oi.innerHTML+=`<p><strong>${ci.name}</strong> • x${ci.qty} • ₹${sub}</p>`;
-    t+=sub;
-  })
-  document.getElementById('orderGrandTotal').textContent='₹'+t.toFixed(2);
+    let sub = (ci.qty*ci.price);
+    oi.innerHTML += `<p><strong>${escapeHtml(ci.name)}</strong> • x${ci.qty} • ₹${sub.toFixed(2)}</p>`;
+    t += sub;
+  });
+  document.getElementById('orderGrandTotal').textContent = '₹' + t.toFixed(2);
 }
-document.getElementById('cancelOrder').onclick=()=>{
+document.getElementById('cancelOrder').onclick = ()=>{
   orderPage.style.display='none';
   document.getElementById('storeMain').style.display='block';
   document.getElementById('cartBox').style.display='block';
-}
+};
 
-// ✅ Fixed Send Order
 document.getElementById('sendOrder').onclick = async ()=>{
-  let n=document.getElementById('ord_name').value.trim();
-  let ph=document.getElementById('ord_phone').value.trim();
-  let ad=document.getElementById('ord_addr').value.trim();
-  let em=document.getElementById('ord_email').value.trim();
-  let notes=document.getElementById('ord_notes').value.trim();
+  let n = document.getElementById('ord_name').value.trim();
+  let ph = document.getElementById('ord_phone').value.trim();
+  let ad = document.getElementById('ord_addr').value.trim();
+  let em = document.getElementById('ord_email').value.trim();
+  let notes = document.getElementById('ord_notes').value.trim();
 
-  if(!n||!ph||!ad){
-    alert("Fill Name, Phone and Address");
-    return;
-  }
+  if(!n||!ph||!ad){ alert("Fill Name, Phone and Address"); return; }
 
   let orderData = { name: n, phone: ph, email: em, address: ad, notes: notes, items: cart };
 
   try {
-    // ⚡ Use relative path
-    let res = await fetch("http://127.0.0.1:3000/api/order", {
+    let res = await fetch("/api/order", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
       body: JSON.stringify(orderData)
     });
-
     let data = await res.json();
-
     if(data.success){
       alert("✅ Order Sent Successfully!\nOrder ID: "+data.orderId);
-      cart = [];
-      saveC(cart);
-      drawCart();
+      cart = []; saveC(cart); drawCart();
       orderPage.style.display='none';
       document.getElementById('cartBox').style.display='block';
       document.getElementById('storeMain').style.display='block';
     } else {
       alert("❌ Error: "+data.message);
     }
-
   } catch (err){
-    alert("❌ Server not responding. Make sure backend is running.");
+    alert("❌ Server not responding. Backend might be offline.");
   }
 };
 
-// CONTACT MENU
-document.getElementById('menuBtn').onclick=()=>document.getElementById('contactPage').style.display='block';
+/* -------------- Contact popup -------------- */
+document.getElementById('menuBtn').onclick = ()=> document.getElementById('contactPage').style.display='block';
 
-// ADMIN LOGIN & PANEL
-// ... rest of your admin code unchanged ...
-// refresh & render
-refreshCats();render();drawCart();
+/* -------------- Admin Toggle & Tools -------------- */
+adminToggle.onclick = ()=>{
+  if(!isAdmin){
+    let pass = prompt("Enter admin password:");
+    if(pass === ADMIN_PASSWORD){
+      isAdmin = true; adminToolbar.style.display = 'block'; alert("Admin mode enabled");
+    } else { alert("Wrong password"); return; }
+  } else {
+    isAdmin = false; adminToolbar.style.display = 'none'; alert("Admin mode disabled");
+  }
+  render();
+};
+
+/* Add Product modal */
+document.getElementById('btnAddProduct').onclick = ()=> openProductModal();
+
+function openProductModal(product){
+  // product optional; if provided -> edit
+  const isEdit = !!product;
+  const modal = document.createElement('div');
+  modal.className = 'modal-backdrop';
+  modal.innerHTML = `
+    <div class="modal">
+      <h3>${isEdit ? 'Edit Product' : 'Add Product'}</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input id="m_name" placeholder="Name" class="input-inline"/>
+        <input id="m_sku" placeholder="SKU" class="input-inline"/>
+        <input id="m_type" placeholder="Type (Academic/Stationery...)" class="input-inline"/>
+        <input id="m_category" placeholder="Category" class="input-inline"/>
+        <input id="m_price" placeholder="Price" type="number" class="input-inline"/>
+        <input id="m_qty" placeholder="Quantity" type="number" class="input-inline"/>
+      </div>
+      <div style="margin-top:8px">
+        <input id="m_image" placeholder="Image URL (optional)" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px"/>
+      </div>
+      <div style="margin-top:8px">
+        <textarea id="m_desc" placeholder="Description" rows="3" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        <button id="m_cancel" class="btn secondary">Cancel</button>
+        <button id="m_save" class="btn">${isEdit ? 'Save' : 'Add'}</button>
+      </div>
+    </div>
+  `;
+  adminModalRoot.innerHTML = ''; adminModalRoot.appendChild(modal); adminModalRoot.style.display = 'block';
+
+  // prefill if editing
+  if(isEdit){
+    modal.querySelector('#m_name').value = product.name || '';
+    modal.querySelector('#m_sku').value = product.sku || '';
+    modal.querySelector('#m_type').value = product.type || '';
+    modal.querySelector('#m_category').value = product.category || '';
+    modal.querySelector('#m_price').value = product.price || 0;
+    modal.querySelector('#m_qty').value = product.quantity || 0;
+    modal.querySelector('#m_image').value = product.image || '';
+    modal.querySelector('#m_desc').value = product.description || '';
+  }
+
+  modal.querySelector('#m_cancel').onclick = ()=> { adminModalRoot.style.display='none'; adminModalRoot.innerHTML=''; };
+  modal.querySelector('#m_save').onclick = ()=>{
+    const name = modal.querySelector('#m_name').value.trim();
+    const sku = modal.querySelector('#m_sku').value.trim();
+    const type = modal.querySelector('#m_type').value.trim();
+    const category = modal.querySelector('#m_category').value.trim();
+    const price = Number(modal.querySelector('#m_price').value) || 0;
+    const qty = Number(modal.querySelector('#m_qty').value) || 0;
+    const image = modal.querySelector('#m_image').value.trim();
+    const desc = modal.querySelector('#m_desc').value.trim();
+
+    if(!name){ alert('Name required'); return; }
+
+    if(isEdit){
+      product.name = name; product.sku = sku; product.type = type; product.category = category;
+      product.price = price; product.quantity = qty; product.image = image; product.description = desc;
+    } else {
+      const id = uid();
+      products.unshift({ id, name, sku, type, category, price, quantity: qty, description: desc, image });
+    }
+
+    saveP(products); refreshCats(); render();
+    adminModalRoot.style.display='none'; adminModalRoot.innerHTML='';
+  };
+}
+
+/* open edit product by id */
+function openEditProduct(id){
+  const p = products.find(x=>x.id===id); if(!p) return;
+  openProductModal(p);
+}
+
+/* remove product */
+function removeProduct(id){
+  if(!confirm('Delete this product?')) return;
+  products = products.filter(x=>x.id!==id);
+  saveP(products); refreshCats(); render();
+}
+
+/* reset to default products */
+document.getElementById('btnClearProducts').onclick = ()=>{
+  if(!confirm('Reset product list to default? This will overwrite current products.')) return;
+  products = DEFAULT_PRODUCTS.slice(); saveP(products); refreshCats(); render();
+};
+
+/* -------------- Import / Export -------------- */
+document.getElementById('btnExport').onclick = ()=>{
+  // export products array to xlsx
+  const ws = XLSX.utils.json_to_sheet(products);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Products');
+  XLSX.writeFile(wb, 'dps_products.xlsx');
+};
+
+document.getElementById('btnExportJSON').onclick = ()=>{
+  const blob = new Blob([JSON.stringify(products, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'dps_products.json'; a.click();
+  URL.revokeObjectURL(url);
+};
+
+document.getElementById('btnImport').onclick = ()=> importFile.click();
+
+importFile.onchange = (ev)=>{
+  const f = ev.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    const data = e.target.result;
+    let wb = XLSX.read(data, {type:'binary'});
+    const sheetName = wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    const json = XLSX.utils.sheet_to_json(sheet);
+    // Expecting columns: name, sku, type, category, price, quantity, description, image
+    const mapped = json.map(r=>({
+      id: uid(),
+      name: r.name || r.Name || r.N || 'Unnamed',
+      sku: r.sku || r.SKU || r.Sku || '',
+      type: r.type || r.Type || '',
+      category: r.category || r.Category || '',
+      price: Number(r.price || r.Price || 0),
+      quantity: Number(r.quantity || r.Quantity || 0),
+      description: r.description || r.Description || '',
+      image: r.image || r.Image || ''
+    }));
+    // merge: add imported items at top
+    products = mapped.concat(products);
+    saveP(products); refreshCats(); render();
+    alert('Imported ' + mapped.length + ' products');
+  };
+  // read as binary string for xlsx
+  reader.readAsBinaryString(f);
+};
+
+/* -------------- Utilities for file downloads & UI events -------------- */
+function downloadFile(filename, contents){
+  const blob = new Blob([contents], {type: 'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* -------------- Filters & events -------------- */
+filterType.onchange = ()=> render();
+filterCategory.onchange = ()=> render();
+searchBox.oninput = ()=> render();
+document.getElementById('resetFilters').onclick = ()=>{
+  filterType.value=''; filterCategory.value=''; searchBox.value=''; render();
+};
+
+/* -------------- Init -------------- */
+refreshCats(); render(); drawCart();
+
+/* -------------- Expose functions to global scope used by dynamic HTML -------------- */
+window.addToCart = addToCart;
+window.openEditProduct = openEditProduct;
+window.removeProduct = removeProduct;
+
+/* -------------- END -------------- */
 </script>
 </body>
 </html>
