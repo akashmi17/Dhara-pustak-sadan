@@ -1,27 +1,35 @@
+// server.js
 const express = require("express");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 const bodyParser = require("body-parser");
-const path = require("path");   // ✅ IMPORTANT
+const path = require("path"); // ✅ Required for static files
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// ✅ Serve public folder
+// ✅ Serve static files from 'public' folder
 app.use(express.static(path.join(__dirname, "public")));
 
-// OWNER EMAIL
-const OWNER_EMAIL = "dharapustaksadan@gmail.com";
+// ✅ Environment variables for email credentials
+const OWNER_EMAIL = process.env.OWNER_EMAIL;
+const OWNER_PASS = process.env.OWNER_PASS;
 
-// ✅ Gmail SMTP
+// Validate env variables
+if (!OWNER_EMAIL || !OWNER_PASS) {
+  console.error("Error: OWNER_EMAIL or OWNER_PASS not set in environment variables.");
+  process.exit(1); // Stop the server if credentials are missing
+}
+
+// ✅ Gmail SMTP configuration
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
   secure: true,
   auth: {
     user: OWNER_EMAIL,
-    pass: "kkylvajzylmjejnx"
+    pass: OWNER_PASS
   }
 });
 
@@ -29,6 +37,12 @@ const transporter = nodemailer.createTransport({
 app.post("/api/order", async (req, res) => {
   try {
     const o = req.body;
+
+    // Basic validation
+    if (!o.name || !o.phone || !o.address || !o.items || !Array.isArray(o.items) || o.items.length === 0) {
+      return res.status(400).json({ success: false, message: "Invalid order data" });
+    }
+
     const orderId = "DPS-" + Date.now();
 
     let html = `
@@ -50,6 +64,7 @@ app.post("/api/order", async (req, res) => {
 
     html += `</ul><h3>Total: ₹${total}</h3>`;
 
+    // Send email
     await transporter.sendMail({
       from: `"Dhara Pustak Sadan" <${OWNER_EMAIL}>`,
       to: OWNER_EMAIL,
@@ -61,17 +76,17 @@ app.post("/api/order", async (req, res) => {
 
   } catch (err) {
     console.error("SMTP ERROR:", err);
-    res.json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ✅ Serve index.html for all routes
+// ✅ Serve index.html for all other routes (SPA)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// ✅ Start server
-
+// ✅ Start server on Render's port or fallback to 3000
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Backend running on port ${PORT}`));
-
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
