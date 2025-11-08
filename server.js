@@ -13,8 +13,8 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 // ✅ Environment variables for email credentials
-const OWNER_EMAIL = process.env.OWNER_EMAIL;
-const OWNER_PASS = process.env.OWNER_PASS;
+const OWNER_EMAIL = 'dharapustaksadan@gmail.com'
+const OWNER_PASS = 'uttseeuzjvysweub';
 
 // Validate env variables
 if (!OWNER_EMAIL || !OWNER_PASS) {
@@ -81,9 +81,10 @@ app.post("/api/order", async (req, res) => {
 });
 
 // ✅ Serve index.html for all other routes (SPA)
-app.get("*", (req, res) => {
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
 
 // ✅ Start server on Render's port or fallback to 3000
 const PORT = process.env.PORT || 3000;

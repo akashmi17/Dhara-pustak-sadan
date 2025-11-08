@@ -144,6 +144,7 @@ footer{text-align:center;padding:18px;font-size:13px;color:#666;margin-top:40px}
 <footer>© Dhara Pustak Sadan • All Rights Reserved</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="server.js"></script>
 
 <script>
 const DEFAULT_PRODUCTS=[
@@ -270,7 +271,7 @@ document.getElementById('sendOrder').onclick = async ()=>{
 
   try {
     // ⚡ Use relative path
-    let res = await fetch("/api/order", {
+    let res = await fetch("http://127.0.0.1:3000/api/order", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
       body: JSON.stringify(orderData)
