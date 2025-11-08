@@ -2,30 +2,29 @@ const express = require("express");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 const bodyParser = require("body-parser");
-const path = require("path");   // ✅ IMPORTANT
+const path = require("path");
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// ✅ Serve public folder
+// ✅ Serve UI (public folder)
 app.use(express.static(path.join(__dirname, "public")));
 
 // OWNER EMAIL
 const OWNER_EMAIL = "dharapustaksadan@gmail.com";
 
-// ✅ Gmail SMTP
+// ✅ Gmail SMTP config
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
   secure: true,
   auth: {
     user: OWNER_EMAIL,
-    pass: "kkylvajzylmjejnx"
+    pass: "kkylvajzylmjejnx" // Gmail APP password
   }
 });
 
-// ✅ Order API
 app.post("/api/order", async (req, res) => {
   try {
     const o = req.body;
@@ -65,13 +64,9 @@ app.post("/api/order", async (req, res) => {
   }
 });
 
-// ✅ Serve index.html for all routes
-app.get("*", (req, res) => {
+// ✅ open index.html
+app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// ✅ Start server
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Backend running on port ${PORT}`));
-
+app.listen(3000, () => console.log("✅ Backend running at http://localhost:3000"));
